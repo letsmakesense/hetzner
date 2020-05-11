@@ -41,26 +41,25 @@ class FailoverManager(object):
             failovers[failover.ip] = failover
         return failovers
 
-    def set(self, ip, new_destination):
+    def set(self, ip, dest_list):
         failovers = self.list()
         if ip not in failovers.keys():
             raise RobotError(
                 "Invalid IP address '%s'. Failover IP addresses are %s"
                 % (ip, failovers.keys()))
         failover = failovers.get(ip)
-        dest_list = new_destination.split(' ')
         if failover.active_server_ip in dest_list:
             raise RobotError(
                 "%s is already the active destination of failover IP %s"
-                % (new_destination, ip))
+                % (dest_list.join(', '), ip))
         available_dests = set([s.ip for s in list(self.servers)])
         if len(available_dests.intersection(set(dest_list))) == 0:
             raise RobotError(
                 "Invalid destination '%s'. "
                 "The destination is not in your server list: %s"
-                % (new_destination, available_dests))
+                % (dest_list.join(', '), available_dests))
         result = self.conn.post('/failover/%s'
-                                % ip, {'active_server_ip': new_destination})
+                                % ip, {'active_server_ip': dest_list.join(', ')})
         return Failover(result.get('failover'))
 
     def monitor(self):
@@ -71,10 +70,10 @@ class FailoverManager(object):
         failovers = self.list()
         if len(failovers) > 0:
             ips = self._get_active_ips()
-            host_ip = self._get_host_ip()
+            host_ips = self._get_host_ip().split(' ')
             for failover_ip, failover in failovers.items():
-                if failover_ip in ips and failover.active_server_ip != host_ip:
-                    new_failover = self.set(failover_ip, host_ip)
+                if failover_ip in ips and failover.active_server_ip not in host_ips:
+                    new_failover = self.set(failover_ip, host_ips)
                     if new_failover:
                         msgs.append("Failover IP successfully assigned to new"
                                     " destination")
