@@ -41,25 +41,25 @@ class FailoverManager(object):
             failovers[failover.ip] = failover
         return failovers
 
-    def set(self, ip, dest_list):
+    def set(self, ip, new_destination):
         failovers = self.list()
         if ip not in failovers.keys():
             raise RobotError(
                 "Invalid IP address '%s'. Failover IP addresses are %s"
                 % (ip, failovers.keys()))
         failover = failovers.get(ip)
-        if failover.active_server_ip in dest_list:
+        if failover.active_server_ip == new_destination:
             raise RobotError(
                 "%s is already the active destination of failover IP %s"
-                % (', '.join(dest_list), ip))
-        available_dests = set([s.ip for s in list(self.servers)])
-        if len(available_dests.intersection(set(dest_list))) == 0:
+                % (new_destination, ip))
+        available_dests = [s.ip for s in list(self.servers)]
+        if new_destination not in available_dests:
             raise RobotError(
                 "Invalid destination '%s'. "
                 "The destination is not in your server list: %s"
-                % (', '.join(dest_list), available_dests))
-        result = self.conn.post('/failover/%s' % ip,
-                                {'active_server_ip': ','.join(dest_list)})
+                % (new_destination, available_dests))
+        result = self.conn.post('/failover/{}'.format(ip),
+                                {'active_server_ip': new_destination})
         return Failover(result.get('failover'))
 
     def monitor(self):
@@ -70,10 +70,12 @@ class FailoverManager(object):
         failovers = self.list()
         if len(failovers) > 0:
             ips = self._get_active_ips()
-            host_ips = self._get_host_ip().split(' ')
+            host_ip = self._get_host_ip()
+            if not host_ip:
+                raise RobotError("No valid host ip found")
             for failover_ip, failover in failovers.items():
-                if failover_ip in ips and failover.active_server_ip not in host_ips:
-                    new_failover = self.set(failover_ip, host_ips)
+                if failover_ip in ips and failover.active_server_ip != host_ip:
+                    new_failover = self.set(failover_ip, host_ip)
                     if new_failover:
                         msgs.append("Failover IP successfully assigned to new"
                                     " destination")
@@ -83,7 +85,8 @@ class FailoverManager(object):
     def _get_active_ips(self):
         ips = []
         try:
-            out = subprocess.check_output(["lxc-ls", "--active", "-fF", "IPV4"])
+            out = subprocess.check_output(
+                ["lxc-ls", "--active", "-fF", "IPV4"]).decode().strip()
         except subprocess.CalledProcessError as e:
             raise RobotError(str(e))
         except Exception as e:
@@ -96,11 +99,15 @@ class FailoverManager(object):
 
     def _get_host_ip(self):
         try:
-            host_ip = subprocess.check_output(["hostname", "--ip-address"])
+            host_ips = subprocess.check_output(
+                ["hostname", "--all-ip-addresses"]).decode().strip()
+            server_ips = set([s.ip for s in list(self.servers)])
         except subprocess.CalledProcessError as e:
             raise RobotError(str(e))
         except Exception as e:
             raise RobotError(str(e))
         else:
-            return host_ip.strip()
+            ips = set(host_ips.split(' '))
+            host_ip = server_ips.intersection(ips)
+            return host_ip.pop() if len(host_ip) == 1 else None
 
