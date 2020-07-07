@@ -59,7 +59,7 @@ class FailoverManager(object):
                 "The destination is not in your server list: %s"
                 % (', '.join(dest_list), available_dests))
         result = self.conn.post('/failover/%s' % ip,
-                                {'active_server_ip': ', '.join(dest_list)})
+                                {'active_server_ip': ','.join(dest_list)})
         return Failover(result.get('failover'))
 
     def monitor(self):
