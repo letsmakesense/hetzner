@@ -51,15 +51,15 @@ class FailoverManager(object):
         if failover.active_server_ip in dest_list:
             raise RobotError(
                 "%s is already the active destination of failover IP %s"
-                % (dest_list.join(', '), ip))
+                % (', '.join(dest_list), ip))
         available_dests = set([s.ip for s in list(self.servers)])
         if len(available_dests.intersection(set(dest_list))) == 0:
             raise RobotError(
                 "Invalid destination '%s'. "
                 "The destination is not in your server list: %s"
-                % (dest_list.join(', '), available_dests))
-        result = self.conn.post('/failover/%s'
-                                % ip, {'active_server_ip': dest_list.join(', ')})
+                % (', '.join(dest_list), available_dests))
+        result = self.conn.post('/failover/%s' % ip,
+                                {'active_server_ip': ', '.join(dest_list)})
         return Failover(result.get('failover'))
 
     def monitor(self):
