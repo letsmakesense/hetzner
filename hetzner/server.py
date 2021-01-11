@@ -441,9 +441,9 @@ class Server(object):
         self.product = data['product']
         self.datacenter = data['dc']
         self.traffic = data['traffic']
-        self.flatrate = data['flatrate']
         self.status = data['status']
-        self.throttled = data['throttled']
+        self.connected_ips = data['ip']
+        self.connected_subnets = data['subnet']
         self.cancelled = data['cancelled']
         self.paid_until = datetime.strptime(data['paid_until'], '%Y-%m-%d')
         self.is_vserver = self.product.startswith('VQ')
